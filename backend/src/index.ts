@@ -423,16 +423,11 @@ const extractImageUrls = (value: unknown): string[] => {
 // 将图片 URL 转换为 base64 格式
 const convertImageUrlToBase64 = async (url: string): Promise<string | null> => {
   try {
-    // 如果是本地文件路径（uploads 目录）
-    if (url.startsWith("http://localhost:") || url.startsWith("http://127.0.0.1:")) {
-      const urlObj = new URL(url);
-      const urlPath = urlObj.pathname;
-      const normalizedPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
-      const filePath = path.join(process.cwd(), normalizedPath);
+    // 辅助函数：读取本地文件并转换为 base64
+    const readLocalFile = (filePath: string): string | null => {
       if (fs.existsSync(filePath)) {
         const imageBuffer = fs.readFileSync(filePath);
         const base64 = imageBuffer.toString("base64");
-        // 根据文件扩展名确定 MIME 类型
         const ext = path.extname(filePath).toLowerCase();
         const mimeTypes: Record<string, string> = {
           ".jpg": "image/jpeg",
@@ -444,6 +439,30 @@ const convertImageUrlToBase64 = async (url: string): Promise<string | null> => {
         const mimeType = mimeTypes[ext] || "image/jpeg";
         return `data:${mimeType};base64,${base64}`;
       }
+      return null;
+    };
+
+    // 如果已经是 base64 格式，直接返回
+    if (url.startsWith("data:image/")) {
+      return url;
+    }
+
+    // 处理相对路径（如 /uploads/xxx.jpg）
+    if (url.startsWith("/uploads/") || url.startsWith("uploads/")) {
+      const normalizedPath = url.startsWith("/") ? url.slice(1) : url;
+      const filePath = path.join(process.cwd(), normalizedPath);
+      const result = readLocalFile(filePath);
+      if (result) return result;
+    }
+    
+    // 如果是本地文件路径（localhost URL）
+    if (url.startsWith("http://localhost:") || url.startsWith("http://127.0.0.1:")) {
+      const urlObj = new URL(url);
+      const urlPath = urlObj.pathname;
+      const normalizedPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
+      const filePath = path.join(process.cwd(), normalizedPath);
+      const result = readLocalFile(filePath);
+      if (result) return result;
     }
     
     // 如果是远程 URL，尝试下载
@@ -459,13 +478,9 @@ const convertImageUrlToBase64 = async (url: string): Promise<string | null> => {
       return `data:${contentType};base64,${base64}`;
     }
     
-    // 如果已经是 base64 格式，直接返回
-    if (url.startsWith("data:image/")) {
-      return url;
-    }
-    
     return null;
   } catch (error) {
+    console.error("convertImageUrlToBase64 error:", error);
     return null;
   }
 };
@@ -1071,17 +1086,22 @@ const executeNode = async (
             
             // 处理图片
             const processImage = async (imageUrl: string) => {
+              // 检测是否需要转换为 base64（本地文件或相对路径）
+              const needsBase64Conversion =
+                imageUrl.startsWith("/uploads/") ||
+                imageUrl.startsWith("uploads/") ||
+                imageUrl.startsWith("http://localhost:") ||
+                imageUrl.startsWith("http://127.0.0.1:") ||
+                imageUrl.startsWith("https://localhost:") ||
+                imageUrl.startsWith("https://127.0.0.1:");
+              
               if (isDoubao) {
                 // Doubao: 本地/不可公网访问 URL 需要转为 base64
-                const isLocal =
-                  imageUrl.startsWith("http://localhost:") ||
-                  imageUrl.startsWith("http://127.0.0.1:") ||
-                  imageUrl.startsWith("https://localhost:") ||
-                  imageUrl.startsWith("https://127.0.0.1:");
-                if (isLocal) {
+                if (needsBase64Conversion) {
                   const base64 = await convertImageUrlToBase64(imageUrl);
                   if (base64) {
                     doubaoContent.push({ type: "input_image", image_url: base64 });
+                    logRun(run, "info", `[${node.name}] Converted image to base64: ${imageUrl.substring(0, 50)}...`);
                   } else {
                     // 转换失败则回退原始 URL
                     logRun(
@@ -1096,10 +1116,11 @@ const executeNode = async (
                   doubaoContent.push({ type: "input_image", image_url: imageUrl });
                 }
               } else {
-                // 标准格式：转换为 base64
+                // 标准格式：始终尝试转换为 base64
                 const base64 = await convertImageUrlToBase64(imageUrl);
                 if (base64) {
                   messageContent.push({ type: "image_url", image_url: { url: base64 } });
+                  logRun(run, "info", `[${node.name}] Converted image to base64: ${imageUrl.substring(0, 50)}...`);
                 } else {
                   // 如果转换失败，尝试使用原始 URL
                   logRun(run, "info", `[${node.name}] Failed to convert image to base64, using original URL: ${imageUrl}`);
