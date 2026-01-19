@@ -105,7 +105,7 @@ const ProfilePage = () => {
             <button className="auth-btn" type="button" onClick={handleSaveProfile}>
               保存资料
             </button>
-            <button className="auth-btn auth-btn-secondary" type="button" onClick={() => navigate("/")}>
+            <button className="auth-btn" type="button" onClick={() => navigate("/")}>
               返回首页
             </button>
           </div>

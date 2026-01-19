@@ -178,9 +178,12 @@ const AllProjectsPage = () => {
           <span className="logo-text">爆单工作流</span>
         </div>
         <div className="home-nav">
-          <select className="lang-select">
-            <option>简体中文</option>
-          </select>
+          <div className="lang-select-wrapper">
+            <span className="lang-icon">🌐</span>
+            <select className="lang-select">
+              <option>简体中文</option>
+            </select>
+          </div>
           <button className="nav-icon-btn">🔔</button>
           <button className="nav-upgrade-btn">
             ⚡ 积分 <span className="upgrade-points">{user?.credits ?? 0}</span>
