@@ -133,20 +133,44 @@ const HomePage = () => {
         edges: workflow.edges,
       };
       const text = JSON.stringify(payload, null, 2);
-      await navigator.clipboard.writeText(text);
-      alert("已复制到剪切板");
+      // 尝试使用现代剪切板 API，失败时使用 fallback
+      try {
+        await navigator.clipboard.writeText(text);
+        alert("已复制到剪切板");
+      } catch {
+        // Fallback: 使用传统方式复制
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        alert("已复制到剪切板");
+      }
     } catch (err) {
       console.error("Error sharing workflow:", err);
-      alert("分享失败");
+      alert("分享失败：" + (err instanceof Error ? err.message : "未知错误"));
     }
   };
 
   const handleImportShare = async () => {
+    // 尝试使用剪切板 API，失败时弹出输入框
+    let text = "";
     try {
-      const text = await navigator.clipboard.readText();
+      text = await navigator.clipboard.readText();
+    } catch {
+      // 剪切板 API 在 HTTP 环境下不可用，使用 prompt 让用户手动粘贴
+      const input = prompt("请粘贴分享的工作流数据（JSON格式）：");
+      if (!input) return;
+      text = input;
+    }
+    
+    try {
       const payload = JSON.parse(text || "{}");
       if (!payload || !Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) {
-        alert("剪切板内容不是有效的分享数据");
+        alert("内容不是有效的分享数据，请确保粘贴完整的JSON格式数据");
         return;
       }
       const name = typeof payload.name === "string" && payload.name.trim()

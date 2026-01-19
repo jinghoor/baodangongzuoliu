@@ -125,18 +125,30 @@
 .nav-avatar-dropdown {
   position: absolute;
   right: 0;
-  top: 46px;
+  top: 100%;
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   min-width: 200px;
   padding: 12px;
+  padding-top: 20px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-6px);
   transition: all 0.15s ease;
   z-index: 10;
+}
+
+/* 添加透明连接区域，防止鼠标移动时菜单消失 */
+.nav-avatar-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: transparent;
 }
 
 .nav-avatar-menu:hover .nav-avatar-dropdown {
