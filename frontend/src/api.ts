@@ -1,4 +1,7 @@
-export const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:1888";
+// 生产环境使用相对路径（空字符串），开发环境使用 localhost:1888
+export const apiBase = import.meta.env.VITE_API_BASE_URL !== undefined 
+  ? import.meta.env.VITE_API_BASE_URL 
+  : "http://localhost:1888";
 
 export const getAuthToken = () => localStorage.getItem("auth_token");
 
