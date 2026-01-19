@@ -578,21 +578,15 @@ const WorkflowEditor = () => {
   }, [nodes, edges, workflowId]);
 
   const addNode = (item: PaletteItem) => {
-    console.log("[addNode] 被调用，item:", item);
-    
     // 如果是占位节点，不添加
     if (item.placeholder) {
-      console.log("[addNode] 占位节点，跳过");
       return;
     }
     
-    const id = crypto.randomUUID();
-    console.log("[addNode] 生成节点ID:", id);
+    // 生成唯一ID（兼容HTTP环境，不依赖crypto.randomUUID）
+    const id = `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     
     const wrapperRect = flowWrapperRef.current?.getBoundingClientRect();
-    console.log("[addNode] flowWrapperRef.current:", flowWrapperRef.current);
-    console.log("[addNode] wrapperRect:", wrapperRect);
-    
     // 计算画布中心的屏幕坐标
     const centerScreen = wrapperRect
       ? {
@@ -600,14 +594,10 @@ const WorkflowEditor = () => {
           y: wrapperRect.top + wrapperRect.height / 2,
         }
       : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    console.log("[addNode] centerScreen:", centerScreen);
-    
-    console.log("[addNode] reactFlowRef.current:", reactFlowRef.current);
     // 使用 screenToFlowPosition 替代已废弃的 project 方法
     const projected = reactFlowRef.current
       ? reactFlowRef.current.screenToFlowPosition(centerScreen)
       : { x: 200, y: 200 };
-    console.log("[addNode] projected:", projected);
     const position = findFreePosition({
       x: Math.max(0, projected.x - 120),
       y: Math.max(0, projected.y - 80),
@@ -782,35 +772,27 @@ const WorkflowEditor = () => {
       defaultOutputMap[port.id] = { path: `vars.${id}.${port.id}` };
     });
 
-    const newNode = {
-      id,
-      type: "default",
-      position,
-      data: {
-        label: item.name,
-        nodeType: item.type,
-        config: {
-          ...(defaultConfigByType[item.type] || {}),
-          outputMap: defaultOutputMap,
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "default",
+        position,
+        data: {
+          label: item.name,
+          nodeType: item.type,
+          config: {
+            ...(defaultConfigByType[item.type] || {}),
+            outputMap: defaultOutputMap,
+          },
+          inputs,
+          outputs,
+          variant,
+          badge,
+          preview,
         },
-        inputs,
-        outputs,
-        variant,
-        badge,
-        preview,
       },
-    };
-    
-    console.log("[addNode] 准备添加新节点:", newNode);
-    
-    setNodes((nds) => {
-      console.log("[addNode] 当前节点数量:", nds.length);
-      const result = [...nds, newNode];
-      console.log("[addNode] 添加后节点数量:", result.length);
-      return result;
-    });
-    
-    console.log("[addNode] setNodes 已调用");
+    ]);
   };
 
   const onConnect = useCallback(
@@ -1681,7 +1663,8 @@ const WorkflowEditor = () => {
 
   const duplicateNode = () => {
     if (!selectedNode) return;
-    const id = crypto.randomUUID();
+    // 生成唯一ID（兼容HTTP环境）
+    const id = `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const position = {
       x: selectedNode.position.x + 40,
       y: selectedNode.position.y + 40,
