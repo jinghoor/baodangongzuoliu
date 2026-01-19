@@ -68,12 +68,6 @@ const palette: PaletteSection[] = [
     title: "AI",
     items: [
       { type: "llm-generic", name: "通用LLM大模型", detail: "支持多种大模型 API", badge: "AI" },
-      {
-        type: "doubao-1-8",
-        name: "豆包1.8多模态模型",
-        detail: "Doubao Seed 1.8 多模态",
-        badge: "AI",
-      },
       { type: "image-placeholder", name: "图像生成", detail: "占位节点", badge: "IMG", placeholder: true },
     ],
   },
