@@ -3682,10 +3682,9 @@ const WorkflowEditor = () => {
           setEdges([]);
           
           const fetchWorkflow = async (cacheMode: RequestCache) => {
-            const loadUrl = new URL(`${apiBase}/workflows/${id}`);
-            // 强制绕过 CDN/浏览器缓存，避免 304 无内容导致空白
-            loadUrl.searchParams.set("_ts", Date.now().toString());
-            return apiFetch(loadUrl.toString(), {
+            // 添加时间戳参数绕过缓存
+            const urlPath = `/workflows/${id}?_ts=${Date.now()}`;
+            return apiFetch(urlPath, {
               cache: cacheMode,
               headers: {
                 "cache-control": "no-cache, no-store, must-revalidate",
