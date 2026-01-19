@@ -1,0 +1,28 @@
+🚀 Railway 后端部署快速参考
+
+=== 关键配置 ===
+
+1. Root Directory: backend
+2. Build Command: npm install && npm run build
+3. Start Command: npm start
+4. 环境变量: NODE_ENV=production
+
+=== 部署步骤 ===
+
+1. 访问 https://railway.app
+2. 登录 GitHub
+3. New Project → Deploy from GitHub repo
+4. 选择仓库: jinghoor/gongzuoliu123
+5. 进入服务 Settings
+6. 设置 Root Directory 为 "backend"
+7. 等待部署完成
+8. 在 Settings → Networking 获取 Public Domain URL
+9. 复制后端 URL（用于前端配置）
+
+=== 获取后端 URL ===
+
+部署成功后：
+Settings → Networking → Public Domain
+复制 URL（例如：https://xxx-production.up.railway.app）
+
+⚠️ 重要：复制完整的 URL，不要包含末尾的斜杠

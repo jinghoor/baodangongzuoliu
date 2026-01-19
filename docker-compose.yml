@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cross-border-workflow
+    ports:
+      - "80:3000"  # 对外80端口，内部3000端口
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DOUBAO_API_KEY=${DOUBAO_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEFAULT_OPENAI_KEY=${DEFAULT_OPENAI_KEY:-}
+    volumes:
+      # 持久化数据目录
+      - ./data:/app/backend/data
+      - ./uploads:/app/backend/uploads
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

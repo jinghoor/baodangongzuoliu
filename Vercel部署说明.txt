@@ -1,0 +1,39 @@
+🎨 Vercel 前端部署快速参考
+
+=== 关键配置 ===
+
+1. Root Directory: frontend
+2. Framework: Vite
+3. Build Command: npm run build
+4. Output Directory: dist
+
+=== 环境变量（最重要！）===
+
+名称: VITE_API_BASE_URL
+值: [粘贴你的 Railway 后端 URL]
+环境: 全选（Production, Preview, Development）
+
+⚠️ 注意：
+- 环境变量值应该是完整的后端 URL
+- 例如：https://xxx-production.up.railway.app
+- 不要包含末尾的斜杠 /
+
+=== 部署步骤 ===
+
+1. 访问 https://vercel.com
+2. 登录 GitHub
+3. Add New Project → Import
+4. 选择仓库: jinghoor/gongzuoliu123
+5. 设置 Root Directory 为 "frontend"
+6. 添加环境变量 VITE_API_BASE_URL
+7. 点击 Deploy
+8. 等待构建完成
+9. 获取前端 URL
+
+=== 测试 ===
+
+部署完成后：
+1. 访问前端 URL
+2. 打开浏览器开发者工具（F12）
+3. 查看 Console 确认没有错误
+4. 测试创建和保存工作流功能

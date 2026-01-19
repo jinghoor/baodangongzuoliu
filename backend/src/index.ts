@@ -19,7 +19,7 @@ import {
 
 type RunLogLevel = "info" | "error";
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 1888;
 const DATA_DIR = path.join(process.cwd(), "data");
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 const WORKFLOWS_FILE = path.join(DATA_DIR, "workflows.json");

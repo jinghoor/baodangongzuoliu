@@ -1,0 +1,28 @@
+Vercel 自定义域名快速配置
+============================
+
+步骤：
+1. 进入 Vercel 项目 → Settings → Domains
+2. 输入你的域名（如：example.com）
+3. 点击 Add
+4. 在域名管理面板添加 DNS 记录：
+
+   A 记录（主域名）：
+   类型: A
+   主机: @（或留空）
+   值: Vercel 提供的 IP（如：76.76.21.21）
+
+   CNAME（www 子域名）：
+   类型: CNAME
+   主机: www
+   值: cname.vercel-dns.com
+
+5. 等待 DNS 生效（15分钟 - 48小时）
+6. Vercel 会自动配置 SSL 证书
+
+注意事项：
+- DNS 传播需要时间，请耐心等待
+- Vercel 会自动配置 HTTPS（免费 SSL）
+- 某些 DNS 提供商不支持主域名 CNAME，使用 A 记录
+
+详细说明：查看 Vercel自定义域名配置.md

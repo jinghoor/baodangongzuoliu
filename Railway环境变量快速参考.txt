@@ -1,0 +1,18 @@
+Railway 添加环境变量快速参考
+================================
+
+步骤：
+1. 进入 Railway 服务页面
+2. 点击 "Variables" 标签
+3. 点击 "New Variable" 按钮
+4. 填写：
+   Name:  NODE_ENV
+   Value: production
+5. 点击 "Add"
+
+完成！
+
+注意：
+- 变量名：NODE_ENV（全大写）
+- 值：production（小写，不需要引号）
+- Railway 会自动重新部署

@@ -1,45 +1,39 @@
-# 依赖
-node_modules/
-.pnp
-.pnp.js
+# Dependencies
+node_modules
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-# 构建输出
-dist/
-build/
+# Build outputs
+/backend/dist
+/frontend/dist
 
-# 环境变量
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Data and uploads (包含用户数据，不应提交)
+/backend/data
+/backend/uploads
+data
+uploads
 
-# 日志
-logs/
+# Logs
+logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
 
-# 编辑器
-.vscode/
-.idea/
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
 *.swp
 *.swo
-*~
 .DS_Store
 
-# 临时文件
-*.tmp
-*.temp
-.cache/
+# OS
+Thumbs.db
 
-# 数据文件（根据实际情况决定是否忽略）
-# backend/data/
-# backend/uploads/
-
-# 备份文件（不需要上传到 GitHub）
+# Backup folder
 备份/
-*.tar.gz
-*.zip
+workflow.tar.gz
