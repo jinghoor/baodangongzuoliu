@@ -13,6 +13,9 @@ RUN npm install
 # 复制前端源代码
 COPY frontend/ ./
 
+# 设置 API 地址为空（使用相对路径，请求同一服务器）
+ENV VITE_API_BASE_URL=""
+
 # 构建前端
 RUN npm run build
 
