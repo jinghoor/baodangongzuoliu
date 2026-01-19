@@ -524,7 +524,21 @@ const WorkflowEditor = () => {
   const [runStatus, setRunStatus] = useState<string>("");
   const [runId, setRunId] = useState<string>("");
   const [showLogs, setShowLogs] = useState<boolean>(true);
-  const [logPanelPos, setLogPanelPos] = useState({ x: 24, y: 120 });
+  // 从 localStorage 恢复日志窗口位置
+  const [logPanelPos, setLogPanelPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem("log-panel-position");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return { x: 24, y: 120 };
+  });
   const [isDraggingLogs, setIsDraggingLogs] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(
     null,
@@ -1067,12 +1081,22 @@ const WorkflowEditor = () => {
       if (!dragStartRef.current) return;
       const dx = e.clientX - dragStartRef.current.startX;
       const dy = e.clientY - dragStartRef.current.startY;
-      setLogPanelPos({
+      const newPos = {
         x: dragStartRef.current.x + dx,
         y: dragStartRef.current.y + dy,
-      });
+      };
+      setLogPanelPos(newPos);
     };
     const handleUp = () => {
+      // 保存日志窗口位置到 localStorage
+      setLogPanelPos((currentPos) => {
+        try {
+          localStorage.setItem("log-panel-position", JSON.stringify(currentPos));
+        } catch {
+          // ignore
+        }
+        return currentPos;
+      });
       setIsDraggingLogs(false);
       dragStartRef.current = null;
     };
@@ -1227,6 +1251,8 @@ const WorkflowEditor = () => {
             ...(n.data.config || {}),
             // 保存节点位置
             position: n.position,
+            // 保存节点尺寸（宽高）
+            ...(n.style ? { nodeStyle: n.style } : {}),
             // 保存节点variant和badge（用于恢复节点颜色）
             ...(n.data.variant ? { variant: n.data.variant } : {}),
             ...(n.data.badge ? { badge: n.data.badge } : {}),
@@ -1236,6 +1262,9 @@ const WorkflowEditor = () => {
           id: e.id,
           source: e.source,
           target: e.target,
+          // 保存源端口和目标端口（关键！用于恢复连线）
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
           label: e.label,
           // 保存边的样式（animated和style）
           animated: e.animated || false,
@@ -3809,13 +3838,19 @@ const WorkflowEditor = () => {
             const variant =
               (config.variant as string) || (n.data?.variant as string) || undefined;
             const badge = (config.badge as string) || (n.data?.badge as string) || undefined;
-            // 从config中移除variant和badge（它们不应该在config中）
-            const { variant: _, badge: __, ...cleanConfig } = config;
+            
+            // 恢复节点尺寸（宽高）
+            const nodeStyle = (config.nodeStyle as Record<string, unknown>) || n.style || undefined;
+            
+            // 从config中移除不应该在config中的字段
+            const { variant: _, badge: __, nodeStyle: ___, position: ____, ...cleanConfig } = config;
             
             return {
               id: n.id,
               type: "default",
               position,
+              // 恢复节点尺寸
+              ...(nodeStyle ? { style: nodeStyle } : {}),
               data: {
                 nodeType,
                 label: n.name || n.data?.label || n.data?.name || nodeType,
@@ -3832,13 +3867,13 @@ const WorkflowEditor = () => {
             };
           }).filter((n: any): n is NonNullable<typeof n> => n !== null);
           
-          // 转换边，需要根据实际连接的端口来确定handle
+          // 转换边，优先使用保存的handle信息
           const loadedEdges = (data.edges || []).map((e: any) => {
             if (!e || !e.id || !e.source || !e.target) {
               console.warn("Invalid edge data:", e);
               return null;
             }
-            // 尝试从边的label或其他信息推断端口，如果没有则使用默认值
+            
             const sourceNode = loadedNodes.find((n: any) => n.id === e.source);
             const targetNode = loadedNodes.find((n: any) => n.id === e.target);
             
@@ -3848,35 +3883,28 @@ const WorkflowEditor = () => {
               return null;
             }
             
-            // 对于text-output和image-output节点，需要根据配置确定端口
-            let sourceHandle = "out";
-            let targetHandle = "in";
+            // 优先使用保存的handle信息，如果没有则推断
+            let sourceHandle = e.sourceHandle;
+            let targetHandle = e.targetHandle;
             
-            if (sourceNode) {
+            // 如果没有保存的handle信息，尝试推断
+            if (!sourceHandle) {
               const outputs = sourceNode.data.outputs || [];
-              if (outputs.length > 0) {
-                sourceHandle = outputs[0].id;
-              }
+              sourceHandle = outputs.length > 0 ? `out-${outputs[0].id}` : "out-out";
             }
             
-            if (targetNode) {
+            if (!targetHandle) {
               const inputs = targetNode.data.inputs || [];
-              if (inputs.length > 0) {
-                targetHandle = inputs[0].id;
-              }
-              // 检查是否是LLM节点的input端口
+              // 检查是否是LLM节点
               const isLLM = ["llm", "llm-file", "llm-generic", "doubao-1-8"].includes(
                 targetNode.data.nodeType,
               );
               if (isLLM) {
-                // LLM节点使用input-0, input-1等
                 const sources = (targetNode.data.config?.inputSources as Array<Record<string, any>>) || [];
                 const idx = sources.findIndex((s: any) => s.sourceNodeId === e.source);
-                if (idx >= 0) {
-                  targetHandle = `input-${idx}`;
-                } else {
-                  targetHandle = "input-0";
-                }
+                targetHandle = idx >= 0 ? `in-input-${idx}` : "in-input-0";
+              } else {
+                targetHandle = inputs.length > 0 ? `in-${inputs[0].id}` : "in-in";
               }
             }
             
@@ -3884,13 +3912,13 @@ const WorkflowEditor = () => {
               id: e.id,
               source: e.source,
               target: e.target,
-              sourceHandle: `out-${sourceHandle}`,
-              targetHandle: `in-${targetHandle}`,
+              sourceHandle,
+              targetHandle,
               label: e.label,
               markerEnd: { type: MarkerType.ArrowClosed },
-              // 恢复边的样式（animated和style）
-              animated: (e as any).animated !== undefined ? (e as any).animated : true,
-              style: (e as any).style || { stroke: "#60a5fa" },
+              // 恢复边的样式
+              animated: e.animated !== undefined ? e.animated : true,
+              style: e.style || { stroke: "#60a5fa" },
             };
           }).filter((e: any): e is NonNullable<typeof e> => e !== null);
           
