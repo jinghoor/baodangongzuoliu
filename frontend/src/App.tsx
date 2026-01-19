@@ -1088,7 +1088,7 @@ const WorkflowEditor = () => {
     };
     const handleUp = () => {
       // 保存日志窗口位置到 localStorage
-      setLogPanelPos((pos) => {
+      setLogPanelPos((pos: { x: number; y: number }) => {
         try {
           localStorage.setItem("workflow-log-panel-pos", JSON.stringify(pos));
         } catch {
