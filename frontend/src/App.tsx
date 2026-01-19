@@ -1237,6 +1237,19 @@ const WorkflowEditor = () => {
 
   const handleSave = async (opts?: { silent?: boolean }) => {
     setIsSaving(true);
+    
+    // 调试：打印保存时的完整数据
+    console.log("=== SAVE DEBUG START ===");
+    console.log("Nodes count:", nodes.length);
+    nodes.forEach((n, i) => {
+      console.log(`Node[${i}] id=${n.id}, style=`, n.style);
+    });
+    console.log("Edges count:", edges.length);
+    edges.forEach((e, i) => {
+      console.log(`Edge[${i}] id=${e.id}, sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
+    });
+    console.log("=== SAVE DEBUG END ===");
+    
     try {
       // 生成并上传缩略图
       const thumbnailUrl = await generateAndUploadThumbnail();
@@ -3785,6 +3798,18 @@ const WorkflowEditor = () => {
           const data = await res.json();
           
           console.log("Loading workflow:", data.id, "nodes:", data.nodes?.length, "edges:", data.edges?.length);
+          
+          // 调试：打印从后端获取的原始数据
+          console.log("=== LOAD DEBUG START ===");
+          console.log("Raw nodes from server:");
+          (data.nodes || []).forEach((n: any, i: number) => {
+            console.log(`RawNode[${i}] id=${n.id}, config.nodeStyle=`, n.config?.nodeStyle);
+          });
+          console.log("Raw edges from server:");
+          (data.edges || []).forEach((e: any, i: number) => {
+            console.log(`RawEdge[${i}] id=${e.id}, sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
+          });
+          console.log("=== LOAD DEBUG END ===");
           
           setWorkflowName(data.name || "我的可视化工作流");
           setWorkflowId(data.id);
