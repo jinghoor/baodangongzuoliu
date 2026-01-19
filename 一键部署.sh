@@ -30,28 +30,33 @@ ACTION=${1:-"help"}
 
 case $ACTION in
     "init")
-        echo -e "${GREEN}[1/4]${NC} 安装 Docker..."
+        echo -e "${GREEN}[1/4]${NC} 安装/升级 Docker..."
         ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP << 'ENDSSH'
-            # 安装 Docker
-            if ! command -v docker &> /dev/null; then
-                echo "安装 Docker..."
-                yum install -y yum-utils
-                yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                yum install -y docker-ce docker-ce-cli containerd.io
-                systemctl start docker
-                systemctl enable docker
+            # 检查 Docker 版本，如果太旧则升级
+            NEED_INSTALL=false
+            if command -v docker &> /dev/null; then
+                DOCKER_VERSION=$(docker --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+                MAJOR_VERSION=$(echo $DOCKER_VERSION | cut -d. -f1)
+                if [ "$MAJOR_VERSION" -lt "20" ]; then
+                    echo "Docker 版本太旧 ($DOCKER_VERSION)，需要升级..."
+                    # 停止并卸载旧版 Docker
+                    systemctl stop docker 2>/dev/null || true
+                    yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+                    NEED_INSTALL=true
+                else
+                    echo "Docker 版本正常: $DOCKER_VERSION"
+                fi
             else
-                echo "Docker 已安装"
+                NEED_INSTALL=true
             fi
             
-            # 安装 Docker Compose
-            if ! command -v docker-compose &> /dev/null; then
-                echo "安装 Docker Compose..."
-                curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-                chmod +x /usr/local/bin/docker-compose
-                ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-            else
-                echo "Docker Compose 已安装"
+            if [ "$NEED_INSTALL" = true ]; then
+                echo "安装最新版 Docker..."
+                yum install -y yum-utils
+                yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+                yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                systemctl start docker
+                systemctl enable docker
             fi
             
             # 开放 80 端口
@@ -59,7 +64,7 @@ case $ACTION in
             firewall-cmd --reload 2>/dev/null || true
             
             echo "Docker: $(docker --version)"
-            echo "Docker Compose: $(docker-compose --version)"
+            echo "Docker Compose: $(docker compose version)"
 ENDSSH
 
         echo -e "${GREEN}[2/4]${NC} 克隆代码..."
@@ -69,10 +74,10 @@ ENDSSH
 ENDSSH
 
         echo -e "${GREEN}[3/4]${NC} 构建镜像..."
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose build"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose build"
 
         echo -e "${GREEN}[4/4]${NC} 启动服务..."
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose up -d"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose up -d"
 
         echo ""
         echo -e "${GREEN}部署完成！${NC}"
@@ -85,28 +90,28 @@ ENDSSH
             cd $PROJECT_DIR
             git fetch origin main
             git reset --hard origin/main
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
 ENDSSH
         echo -e "${GREEN}更新完成！${NC}"
         ;;
 
     "status")
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose ps"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose ps"
         ;;
 
     "logs")
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose logs -f"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose logs -f"
         ;;
 
     "restart")
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose restart"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose restart"
         echo -e "${GREEN}重启完成！${NC}"
         ;;
 
     "stop")
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker-compose down"
+        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP "cd $PROJECT_DIR && docker compose down"
         echo -e "${GREEN}已停止！${NC}"
         ;;
 
