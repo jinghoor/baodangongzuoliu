@@ -927,12 +927,21 @@ const WorkflowEditor = () => {
             if (isLLM && targetPort.startsWith("input-")) {
               const idx = Number(targetPort.replace("in-input-", ""));
               if (!Number.isNaN(idx)) {
+                // 检测源节点类型，自动设置 format
+                const sourceNode = nodes.find((nd) => nd.id === params.source);
+                const isImageSource = 
+                  sourceNode?.data.nodeType === "image-input" ||
+                  sourceNode?.data.nodeType === "image-output" ||
+                  sourcePort === "images" ||
+                  sourcePort.startsWith("image");
+                const autoFormat = isImageSource ? "image" : "text";
+                
                 const sources = (n.data.config?.inputSources as Array<Record<string, any>>) || [];
                 const nextSources = [...sources];
                 while (nextSources.length <= idx) {
                   nextSources.push({
                     mode: "source",
-                    format: "text",
+                    format: autoFormat,
                     sourcePath: "",
                     defaultValue: "",
                     inputLabel: `Input ${nextSources.length + 1}`,
@@ -943,6 +952,7 @@ const WorkflowEditor = () => {
                   mode: "source",
                   sourceNodeId: params.source,
                   sourcePortId: sourcePort,
+                  format: isImageSource ? "image" : (nextSources[idx]?.format || "text"),
                 };
                 const inputs = nextSources.map((_, i) => ({
                   id: `input-${i}`,
@@ -1977,27 +1987,40 @@ const WorkflowEditor = () => {
             const idx = Number(String(e.targetHandle).replace("in-input-", ""));
             if (Number.isNaN(idx)) return;
             
+            // 检测源节点类型，自动设置 format
+            const sourceNode = nodes.find((nd) => nd.id === e.source);
+            const sourcePortId = String(e.sourceHandle || "").replace("out-", "");
+            const isImageSource = 
+              sourceNode?.data.nodeType === "image-input" ||
+              sourceNode?.data.nodeType === "image-output" ||
+              sourcePortId === "images" ||
+              sourcePortId.startsWith("image");
+            const autoFormat = isImageSource ? "image" : "text";
+            
             while (nextSources.length <= idx) {
               nextSources.push({
                 mode: "source",
-                format: "text",
+                format: autoFormat,
                 sourcePath: "",
                 defaultValue: "",
                 inputLabel: `Input ${nextSources.length + 1}`,
               });
             }
             
-            const sourcePortId = String(e.sourceHandle || "").replace("out-", "");
             const existing = nextSources[idx] || {};
+            // 如果源节点或端口变化，或者格式需要更新
+            const needsFormatUpdate = isImageSource && existing.format !== "image";
             if (
               existing.sourceNodeId !== e.source ||
-              existing.sourcePortId !== sourcePortId
+              existing.sourcePortId !== sourcePortId ||
+              needsFormatUpdate
             ) {
               nextSources[idx] = {
                 ...existing,
                 mode: "source",
                 sourceNodeId: e.source,
                 sourcePortId,
+                format: isImageSource ? "image" : (existing.format || "text"),
               };
               sourceChanged = true;
             }
