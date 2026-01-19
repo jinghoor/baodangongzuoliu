@@ -41,24 +41,26 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 安装生产依赖
-COPY backend/package*.json ./
+# 复制后端 package.json 到 backend 目录
+COPY backend/package*.json ./backend/
+
+# 在 backend 目录安装生产依赖
+WORKDIR /app/backend
 RUN npm install --omit=dev
 
 # 复制构建后的后端代码
-COPY --from=backend-builder /app/backend/dist ./backend/dist
-COPY --from=backend-builder /app/backend/package.json ./backend/
+COPY --from=backend-builder /app/backend/dist ./dist
 
-# 复制构建后的前端代码
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# 复制构建后的前端代码到正确位置
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # 创建数据目录
-RUN mkdir -p data uploads
+RUN mkdir -p /app/backend/data /app/backend/uploads
 
 # 暴露端口
 EXPOSE 3000
 
-# 设置工作目录为后端目录
+# 工作目录保持在 backend
 WORKDIR /app/backend
 
 # 启动应用
