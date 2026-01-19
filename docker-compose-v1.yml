@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cross-border-workflow
+    ports:
+      - "1888:1888"
+    env_file:
+      - .env
+    environment:
+      - PORT=1888
+      - NODE_ENV=production
+      - DOUBAO_API_KEY=${DOUBAO_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEFAULT_OPENAI_KEY=${DEFAULT_OPENAI_KEY:-}
+    volumes:
+      - ./data:/app/backend/data
+      - ./uploads:/app/backend/uploads
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
