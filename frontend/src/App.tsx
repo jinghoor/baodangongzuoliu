@@ -527,7 +527,7 @@ const WorkflowEditor = () => {
   // 从 localStorage 恢复日志窗口位置
   const [logPanelPos, setLogPanelPos] = useState(() => {
     try {
-      const saved = localStorage.getItem("log-panel-position");
+      const saved = localStorage.getItem("workflow-log-panel-pos");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === "number" && typeof parsed.y === "number") {
@@ -1081,21 +1081,20 @@ const WorkflowEditor = () => {
       if (!dragStartRef.current) return;
       const dx = e.clientX - dragStartRef.current.startX;
       const dy = e.clientY - dragStartRef.current.startY;
-      const newPos = {
+      setLogPanelPos({
         x: dragStartRef.current.x + dx,
         y: dragStartRef.current.y + dy,
-      };
-      setLogPanelPos(newPos);
+      });
     };
     const handleUp = () => {
       // 保存日志窗口位置到 localStorage
-      setLogPanelPos((currentPos) => {
+      setLogPanelPos((pos) => {
         try {
-          localStorage.setItem("log-panel-position", JSON.stringify(currentPos));
+          localStorage.setItem("workflow-log-panel-pos", JSON.stringify(pos));
         } catch {
           // ignore
         }
-        return currentPos;
+        return pos;
       });
       setIsDraggingLogs(false);
       dragStartRef.current = null;
@@ -1237,64 +1236,39 @@ const WorkflowEditor = () => {
 
   const handleSave = async (opts?: { silent?: boolean }) => {
     setIsSaving(true);
-    
-    // 调试：打印保存时的完整数据
-    console.log("=== SAVE DEBUG START ===");
-    console.log("Nodes count:", nodes.length);
-    nodes.forEach((n, i) => {
-      console.log(`Node[${i}] id=${n.id}, style=`, n.style);
-    });
-    console.log("Edges count:", edges.length);
-    edges.forEach((e, i) => {
-      console.log(`Edge[${i}] id=${e.id}, sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
-    });
-    console.log("=== SAVE DEBUG END ===");
-    
     try {
       // 生成并上传缩略图
       const thumbnailUrl = await generateAndUploadThumbnail();
       
       const payload = {
         name: workflowName,
-        nodes: nodes.map((n) => {
-          const nodeData = {
-            id: n.id,
-            type: n.data.nodeType,
-            name: n.data.label,
-            config: {
-              ...(n.data.config || {}),
-              // 保存节点位置
-              position: n.position,
-              // 保存节点尺寸（宽高）
-              ...(n.style ? { nodeStyle: n.style } : {}),
-              // 保存节点variant和badge（用于恢复节点颜色）
-              ...(n.data.variant ? { variant: n.data.variant } : {}),
-              ...(n.data.badge ? { badge: n.data.badge } : {}),
-            },
-          };
-          // 调试：检查节点是否有尺寸
-          if (n.style) {
-            console.log(`[Save] Node ${n.id} has style:`, n.style);
-          }
-          return nodeData;
-        }),
-        edges: edges.map((e) => {
-          const edgeData = {
-            id: e.id,
-            source: e.source,
-            target: e.target,
-            // 保存源端口和目标端口（关键！用于恢复连线）
-            sourceHandle: e.sourceHandle,
-            targetHandle: e.targetHandle,
-            label: e.label,
-            // 保存边的样式（animated和style）
-            animated: e.animated || false,
-            style: e.style || undefined,
-          };
-          // 调试：检查边的 handle 信息
-          console.log(`[Save] Edge ${e.id}: sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
-          return edgeData;
-        }),
+        nodes: nodes.map((n) => ({
+          id: n.id,
+          type: n.data.nodeType,
+          name: n.data.label,
+          config: {
+            ...(n.data.config || {}),
+            // 保存节点位置
+            position: n.position,
+            // 保存节点尺寸（宽高）- 用于恢复用户调整过的节点大小
+            ...(n.style ? { nodeStyle: n.style } : {}),
+            // 保存节点variant和badge（用于恢复节点颜色）
+            ...(n.data.variant ? { variant: n.data.variant } : {}),
+            ...(n.data.badge ? { badge: n.data.badge } : {}),
+          },
+        })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          // 保存连线端口信息（关键！用于恢复连线）
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
+          label: e.label,
+          // 保存边的样式（animated和style）
+          animated: e.animated || false,
+          style: e.style || undefined,
+        })),
         ...(thumbnailUrl ? { thumbnail: thumbnailUrl } : {}),
       };
       const saveOnce = async (useId: string | null) => {
@@ -3799,18 +3773,6 @@ const WorkflowEditor = () => {
           
           console.log("Loading workflow:", data.id, "nodes:", data.nodes?.length, "edges:", data.edges?.length);
           
-          // 调试：打印从后端获取的原始数据
-          console.log("=== LOAD DEBUG START ===");
-          console.log("Raw nodes from server:");
-          (data.nodes || []).forEach((n: any, i: number) => {
-            console.log(`RawNode[${i}] id=${n.id}, config.nodeStyle=`, n.config?.nodeStyle);
-          });
-          console.log("Raw edges from server:");
-          (data.edges || []).forEach((e: any, i: number) => {
-            console.log(`RawEdge[${i}] id=${e.id}, sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
-          });
-          console.log("=== LOAD DEBUG END ===");
-          
           setWorkflowName(data.name || "我的可视化工作流");
           setWorkflowId(data.id);
           setHasLoaded(true);
@@ -3877,12 +3839,7 @@ const WorkflowEditor = () => {
             const badge = (config.badge as string) || (n.data?.badge as string) || undefined;
             
             // 恢复节点尺寸（宽高）
-            const nodeStyle = (config.nodeStyle as Record<string, unknown>) || n.style || undefined;
-            
-            // 调试：检查节点是否有保存的尺寸
-            if (nodeStyle) {
-              console.log(`[Load] Node ${n.id} has saved style:`, nodeStyle);
-            }
+            const savedStyle = (config.nodeStyle as Record<string, unknown>) || n.style || undefined;
             
             // 从config中移除不应该在config中的字段
             const { variant: _, badge: __, nodeStyle: ___, position: ____, ...cleanConfig } = config;
@@ -3892,7 +3849,7 @@ const WorkflowEditor = () => {
               type: "default",
               position,
               // 恢复节点尺寸
-              ...(nodeStyle ? { style: nodeStyle } : {}),
+              ...(savedStyle ? { style: savedStyle } : {}),
               data: {
                 nodeType,
                 label: n.name || n.data?.label || n.data?.name || nodeType,
@@ -3909,15 +3866,12 @@ const WorkflowEditor = () => {
             };
           }).filter((n: any): n is NonNullable<typeof n> => n !== null);
           
-          // 转换边，优先使用保存的handle信息
+          // 转换边，优先使用保存的handle信息，如果没有则推断
           const loadedEdges = (data.edges || []).map((e: any) => {
             if (!e || !e.id || !e.source || !e.target) {
               console.warn("Invalid edge data:", e);
               return null;
             }
-            
-            // 调试：打印边的原始数据
-            console.log(`[Load] Edge ${e.id} raw data:`, { sourceHandle: e.sourceHandle, targetHandle: e.targetHandle });
             
             const sourceNode = loadedNodes.find((n: any) => n.id === e.source);
             const targetNode = loadedNodes.find((n: any) => n.id === e.target);
@@ -3928,15 +3882,14 @@ const WorkflowEditor = () => {
               return null;
             }
             
-            // 优先使用保存的handle信息，如果没有则推断
+            // 优先使用保存的handle信息
             let sourceHandle = e.sourceHandle;
             let targetHandle = e.targetHandle;
             
-            // 如果没有保存的handle信息，尝试推断
+            // 如果没有保存的handle信息，则推断
             if (!sourceHandle) {
               const outputs = sourceNode.data.outputs || [];
               sourceHandle = outputs.length > 0 ? `out-${outputs[0].id}` : "out-out";
-              console.log(`[Load] Edge ${e.id}: inferred sourceHandle=${sourceHandle}`);
             }
             
             if (!targetHandle) {
@@ -3952,7 +3905,6 @@ const WorkflowEditor = () => {
               } else {
                 targetHandle = inputs.length > 0 ? `in-${inputs[0].id}` : "in-in";
               }
-              console.log(`[Load] Edge ${e.id}: inferred targetHandle=${targetHandle}`);
             }
             
             return {
