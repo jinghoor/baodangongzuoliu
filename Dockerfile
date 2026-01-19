@@ -8,7 +8,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # 安装前端依赖
-RUN npm ci
+RUN npm install
 
 # 复制前端源代码
 COPY frontend/ ./
@@ -25,7 +25,7 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # 安装后端依赖
-RUN npm ci
+RUN npm install
 
 # 复制后端源代码
 COPY backend/ ./
@@ -40,7 +40,7 @@ WORKDIR /app
 
 # 安装生产依赖
 COPY backend/package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # 复制构建后的后端代码
 COPY --from=backend-builder /app/backend/dist ./backend/dist
