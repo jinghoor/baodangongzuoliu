@@ -101,11 +101,11 @@ const ProfilePage = () => {
               <input value={bio} onChange={(e) => setBio(e.target.value)} />
             </div>
           </div>
-          <div className="auth-actions" style={{ alignItems: "flex-start" }}>
+          <div className="auth-actions" style={{ alignItems: "flex-start", flexDirection: "row", gap: "12px" }}>
             <button className="auth-btn" type="button" onClick={handleSaveProfile}>
               保存资料
             </button>
-            <button className="auth-link" type="button" onClick={() => navigate("/")}>
+            <button className="auth-btn auth-btn-secondary" type="button" onClick={() => navigate("/")}>
               返回首页
             </button>
           </div>

@@ -174,8 +174,8 @@ const AllProjectsPage = () => {
     <div className="home-page">
       <div className="home-header">
         <div className="home-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-          <div className="logo-icon">LO</div>
-          <span className="logo-text">Lovart</span>
+          <div className="logo-icon">BD</div>
+          <span className="logo-text">爆单工作流</span>
         </div>
         <div className="home-nav">
           <select className="lang-select">

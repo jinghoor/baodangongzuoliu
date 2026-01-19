@@ -3927,8 +3927,8 @@ const WorkflowEditor = () => {
       <header className="topbar">
         <div className="topbar-left">
           <div className="logo-link" onClick={handleGoHome}>
-            <div className="logo-icon-small">AW</div>
-            <span className="logo-text-small">AAA WorkFlow</span>
+            <div className="logo-icon-small">BD</div>
+            <span className="logo-text-small">爆单工作流</span>
           </div>
           {isEditingName ? (
             <input

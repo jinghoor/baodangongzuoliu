@@ -257,8 +257,8 @@ const HomePage = () => {
     <div className="home-page">
       <div className="home-header">
         <div className="home-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-          <div className="logo-icon">AW</div>
-          <span className="logo-text">AAA WorkFlow</span>
+          <div className="logo-icon">BD</div>
+          <span className="logo-text">爆单工作流</span>
         </div>
         <div className="home-nav">
           <select className="lang-select">
@@ -294,7 +294,7 @@ const HomePage = () => {
       <div className="home-main">
         <div className="home-hero">
           <h1 className="hero-title">
-            <span className="hero-logo">• AAA</span> 工作流
+            <span className="hero-logo">爆单</span>工作流
           </h1>
           <p className="hero-subtitle">你的工作好帮手</p>
           <div className="hero-input-box">

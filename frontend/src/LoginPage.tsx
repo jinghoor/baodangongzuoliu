@@ -27,6 +27,9 @@ const LoginPage = () => {
 
   return (
     <div className="auth-page">
+      <div className="auth-brand">
+        <span className="auth-brand-highlight">爆单</span>工作流
+      </div>
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1 className="auth-title">登录</h1>
         {error && <div className="auth-error">{error}</div>}

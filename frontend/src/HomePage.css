@@ -53,12 +53,31 @@
 }
 
 .lang-select {
-  padding: 6px 12px;
+  padding: 8px 32px 8px 12px;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #ffffff;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
   font-size: 14px;
+  font-weight: 500;
+  color: #374151;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: all 0.2s ease;
+}
+
+.lang-select:hover {
+  border-color: #2563eb;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.lang-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .nav-icon-btn {
@@ -209,7 +228,7 @@
 }
 
 .hero-title {
-  font-size: 36px;
+  font-size: 60px;
   font-weight: 700;
   color: #111827;
   margin: 0 0 12px 0;

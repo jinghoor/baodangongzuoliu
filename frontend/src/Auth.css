@@ -1,10 +1,23 @@
 .auth-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: #f7f8fb;
   padding: 40px 16px;
+  gap: 24px;
+}
+
+.auth-brand {
+  font-size: 48px;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+}
+
+.auth-brand-highlight {
+  color: #2563eb;
 }
 
 .auth-card {
@@ -58,11 +71,27 @@
 .auth-btn {
   border: none;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 10px 16px;
   font-weight: 600;
   cursor: pointer;
   background: #2563eb;
   color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.auth-btn:hover {
+  background: #1d4ed8;
+}
+
+.auth-btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.auth-btn-secondary:hover {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .auth-link {
