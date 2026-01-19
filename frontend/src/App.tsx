@@ -1243,33 +1243,45 @@ const WorkflowEditor = () => {
       
       const payload = {
         name: workflowName,
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          type: n.data.nodeType,
-          name: n.data.label,
-          config: {
-            ...(n.data.config || {}),
-            // 保存节点位置
-            position: n.position,
-            // 保存节点尺寸（宽高）
-            ...(n.style ? { nodeStyle: n.style } : {}),
-            // 保存节点variant和badge（用于恢复节点颜色）
-            ...(n.data.variant ? { variant: n.data.variant } : {}),
-            ...(n.data.badge ? { badge: n.data.badge } : {}),
-          },
-        })),
-        edges: edges.map((e) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          // 保存源端口和目标端口（关键！用于恢复连线）
-          sourceHandle: e.sourceHandle,
-          targetHandle: e.targetHandle,
-          label: e.label,
-          // 保存边的样式（animated和style）
-          animated: e.animated || false,
-          style: e.style || undefined,
-        })),
+        nodes: nodes.map((n) => {
+          const nodeData = {
+            id: n.id,
+            type: n.data.nodeType,
+            name: n.data.label,
+            config: {
+              ...(n.data.config || {}),
+              // 保存节点位置
+              position: n.position,
+              // 保存节点尺寸（宽高）
+              ...(n.style ? { nodeStyle: n.style } : {}),
+              // 保存节点variant和badge（用于恢复节点颜色）
+              ...(n.data.variant ? { variant: n.data.variant } : {}),
+              ...(n.data.badge ? { badge: n.data.badge } : {}),
+            },
+          };
+          // 调试：检查节点是否有尺寸
+          if (n.style) {
+            console.log(`[Save] Node ${n.id} has style:`, n.style);
+          }
+          return nodeData;
+        }),
+        edges: edges.map((e) => {
+          const edgeData = {
+            id: e.id,
+            source: e.source,
+            target: e.target,
+            // 保存源端口和目标端口（关键！用于恢复连线）
+            sourceHandle: e.sourceHandle,
+            targetHandle: e.targetHandle,
+            label: e.label,
+            // 保存边的样式（animated和style）
+            animated: e.animated || false,
+            style: e.style || undefined,
+          };
+          // 调试：检查边的 handle 信息
+          console.log(`[Save] Edge ${e.id}: sourceHandle=${e.sourceHandle}, targetHandle=${e.targetHandle}`);
+          return edgeData;
+        }),
         ...(thumbnailUrl ? { thumbnail: thumbnailUrl } : {}),
       };
       const saveOnce = async (useId: string | null) => {
@@ -3842,6 +3854,11 @@ const WorkflowEditor = () => {
             // 恢复节点尺寸（宽高）
             const nodeStyle = (config.nodeStyle as Record<string, unknown>) || n.style || undefined;
             
+            // 调试：检查节点是否有保存的尺寸
+            if (nodeStyle) {
+              console.log(`[Load] Node ${n.id} has saved style:`, nodeStyle);
+            }
+            
             // 从config中移除不应该在config中的字段
             const { variant: _, badge: __, nodeStyle: ___, position: ____, ...cleanConfig } = config;
             
@@ -3874,6 +3891,9 @@ const WorkflowEditor = () => {
               return null;
             }
             
+            // 调试：打印边的原始数据
+            console.log(`[Load] Edge ${e.id} raw data:`, { sourceHandle: e.sourceHandle, targetHandle: e.targetHandle });
+            
             const sourceNode = loadedNodes.find((n: any) => n.id === e.source);
             const targetNode = loadedNodes.find((n: any) => n.id === e.target);
             
@@ -3891,6 +3911,7 @@ const WorkflowEditor = () => {
             if (!sourceHandle) {
               const outputs = sourceNode.data.outputs || [];
               sourceHandle = outputs.length > 0 ? `out-${outputs[0].id}` : "out-out";
+              console.log(`[Load] Edge ${e.id}: inferred sourceHandle=${sourceHandle}`);
             }
             
             if (!targetHandle) {
@@ -3906,6 +3927,7 @@ const WorkflowEditor = () => {
               } else {
                 targetHandle = inputs.length > 0 ? `in-${inputs[0].id}` : "in-in";
               }
+              console.log(`[Load] Edge ${e.id}: inferred targetHandle=${targetHandle}`);
             }
             
             return {
