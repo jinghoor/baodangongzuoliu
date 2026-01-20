@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: cross-border-workflow
-    ports:
-      - "80:3000"  # 对外80端口，内部3000端口
+    # ports:
+    #   - "80:3000"  # 由Nginx代理，不再直接暴露
     environment:
       - PORT=3000
       - NODE_ENV=production
