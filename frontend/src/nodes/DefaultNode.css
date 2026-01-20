@@ -184,6 +184,14 @@
   margin-bottom: 0;
 }
 
+.node-preview-text-input {
+  height: 220px;
+  max-height: 220px;
+  min-height: 220px;
+  flex: 0 0 220px;
+  box-sizing: border-box;
+}
+
 .node-preview-doubao.collapsed {
   height: 30px;
   max-height: 30px;
