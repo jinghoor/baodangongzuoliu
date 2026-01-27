@@ -1,0 +1,44 @@
+========================================
+  通过代理快速部署（复制使用）
+========================================
+
+【前提】安装 proxychains
+macOS: brew install proxychains-ng
+Ubuntu: sudo apt-get install proxychains4
+
+【步骤 1】配置代理（首次使用）
+编辑配置文件，在 [ProxyList] 部分添加：
+socks5 103.219.103.199 28826 14affc5de9939 e40b81193e
+
+配置文件位置：
+macOS: ~/.proxychains/proxychains.conf 或 /usr/local/etc/proxychains.conf
+Ubuntu: /etc/proxychains.conf
+
+【步骤 2】测试连接
+proxychains4 ssh -p 64478 root@206.119.175.36 "echo '连接成功'"
+
+【步骤 3】执行部署
+方法A - 使用脚本：
+./一键部署-代理版.sh update
+
+方法B - 手动执行：
+proxychains4 ssh -p 64478 root@206.119.175.36
+# 连接后在服务器上执行：
+cd /root/baodangongzuoliu && \
+git fetch origin main && \
+git reset --hard origin/main && \
+docker compose down && \
+docker compose build --no-cache && \
+docker compose up -d && \
+docker compose ps
+
+========================================
+  代理信息
+========================================
+类型: SOCKS5
+地址: 103.219.103.199
+端口: 28826
+用户: 14affc5de9939
+密码: e40b81193e
+
+========================================

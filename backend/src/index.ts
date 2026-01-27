@@ -1013,6 +1013,9 @@ const executeNode = async (
       let messageContent: Array<{ type: string; text?: string; image_url?: any }> = [];
       const textParts: string[] = [];
       
+      // 图片生成模式下，用于收集输入图像（用于编辑接口）
+      const inputImagesForEdit: string[] = [];
+      
       // 如果有 basePrompt，先添加
       if (basePrompt) {
         textParts.push(basePrompt);
@@ -1065,6 +1068,24 @@ const executeNode = async (
             }
           }
         } else if (format === "image") {
+          // 如果是图片生成模式，图像输入用于图片编辑接口
+          if (isImageGeneration) {
+            // 图片生成模式下，收集图像用于编辑接口
+            if (value !== undefined && value !== null) {
+              if (typeof value === "string") {
+                inputImagesForEdit.push(value);
+              } else if (Array.isArray(value)) {
+                for (const item of value) {
+                  const url = typeof item === "string" ? item : (item as any)?.url;
+                  if (url) inputImagesForEdit.push(url);
+                }
+              } else if (typeof value === "object" && (value as any).url) {
+                inputImagesForEdit.push((value as any).url);
+              }
+            }
+            continue; // 跳过后续处理，图像会在图片生成逻辑中处理
+          }
+          
           // 如果模型不支持视觉，降级为文本提示
           if (!supportsVision) {
             const count =
@@ -1200,7 +1221,7 @@ const executeNode = async (
         logRun(run, "info", `[${node.name}] messageContent: ${JSON.stringify(summary)}`);
       }
 
-      // 如果是图片生成模式，使用图片生成 API
+      // 如果是图片生成模式，使用图片生成/编辑 API
       if (isImageGeneration) {
         const prompt = basePrompt || textParts.join("\n\n") || "";
         if (!prompt) {
@@ -1208,47 +1229,133 @@ const executeNode = async (
           throw new Error("Image generation requires a prompt");
         }
 
+        // 收集输入图像（用于编辑接口）
+        // 合并从 inputSources 收集的图像和旧配置方式的图像
+        const inputImages: string[] = [...inputImagesForEdit];
+        images.forEach((url) => {
+          if (url) inputImages.push(url);
+        });
+
+        // 检查是否有图像输入（用于决定使用生成还是编辑接口）
+        const hasImageInput = inputImages.length > 0;
+
         if (!apiKey) {
           const mockImage = `MOCK_IMAGE(${model}): ${prompt.slice(0, 200)}`;
           const outPath = (effectiveConfig.outputPath as string) || `vars.${node.id}.image`;
           setByPath(context, outPath, { url: mockImage, note: "mock image" });
           writeOutput(node, "image", { url: mockImage }, context);
-          logRun(run, "info", `[${node.name}] mock image generation -> ${outPath}`);
+          logRun(run, "info", `[${node.name}] mock image ${hasImageInput ? "edit" : "generation"} -> ${outPath}`);
           return { contextPatch: {} };
         }
 
-        // 构建图片生成请求
-        const imageGenEndpoint = `${baseURL}/images/generations`;
         const responseFormat = (effectiveConfig.response_format as string) || "b64_json";
         const size = (effectiveConfig.size as string) || "1024x1024";
         const aspectRatio = effectiveConfig.aspect_ratio as string | undefined;
 
-        const imageGenPayload: any = {
-          model,
-          prompt,
-          response_format: responseFormat,
-          size,
-        };
-
-        // 仅 gemini-3-pro-image-preview 支持 aspect_ratio
-        if (aspectRatio && /gemini-3-pro-image-preview/i.test(model)) {
-          imageGenPayload.aspect_ratio = aspectRatio;
-        }
-
         try {
-          logRun(run, "info", `[${node.name}] image generation request -> ${imageGenEndpoint} model=${model}`);
-          const res = await fetch(imageGenEndpoint, {
+          let endpoint: string;
+          let payload: any;
+
+          if (hasImageInput && inputImages.length > 0) {
+            // 有图像输入 -> 使用图片编辑接口（图生图）
+            endpoint = `${baseURL}/images/edits`;
+            
+            // 处理第一张图片（图片编辑接口通常只支持一张输入图片）
+            const firstImage = inputImages[0];
+            let imageData: string | Buffer = firstImage;
+            
+            // 转换图片为 base64 字符串（不带 data URL 前缀）
+            if (firstImage.startsWith("data:image/")) {
+              // 提取 base64 部分
+              const base64Match = firstImage.match(/^data:image\/[^;]+;base64,(.+)$/);
+              if (base64Match) {
+                imageData = base64Match[1];
+              } else {
+                imageData = firstImage;
+              }
+            } else if (firstImage.startsWith("/uploads/") || firstImage.startsWith("uploads/")) {
+              // 本地文件，转换为 base64
+              const base64 = await convertImageUrlToBase64(firstImage);
+              if (base64 && base64.startsWith("data:image/")) {
+                const base64Match = base64.match(/^data:image\/[^;]+;base64,(.+)$/);
+                if (base64Match) {
+                  imageData = base64Match[1];
+                } else {
+                  imageData = base64;
+                }
+              } else if (base64) {
+                imageData = base64;
+              } else {
+                throw new Error(`Failed to convert image to base64: ${firstImage}`);
+              }
+            } else if (firstImage.startsWith("http://") || firstImage.startsWith("https://")) {
+              // 远程 URL，下载并转换为 base64
+              const base64 = await convertImageUrlToBase64(firstImage);
+              if (base64 && base64.startsWith("data:image/")) {
+                const base64Match = base64.match(/^data:image\/[^;]+;base64,(.+)$/);
+                if (base64Match) {
+                  imageData = base64Match[1];
+                } else {
+                  imageData = base64;
+                }
+              } else if (base64) {
+                imageData = base64;
+              } else {
+                throw new Error(`Failed to download and convert image: ${firstImage}`);
+              }
+            }
+
+            // 图片编辑接口通常需要 multipart/form-data，但某些 API 可能支持 JSON
+            // 先尝试 JSON 格式，如果失败可以回退到 FormData
+            payload = {
+              model,
+              prompt,
+              image: imageData, // base64 字符串
+              response_format: responseFormat,
+              size,
+              n: 1, // 生成图片数量
+            };
+
+            // 仅 gemini-3-pro-image-preview 支持 aspect_ratio
+            if (aspectRatio && /gemini-3-pro-image-preview/i.test(model)) {
+              payload.aspect_ratio = aspectRatio;
+            }
+
+            logRun(run, "info", `[${node.name}] image edit request -> ${endpoint} model=${model} (${inputImages.length} input images, using first image)`);
+          } else {
+            // 无图像输入 -> 使用图片生成接口（文生图）
+            endpoint = `${baseURL}/images/generations`;
+            
+            payload = {
+              model,
+              prompt,
+              response_format: responseFormat,
+              size,
+            };
+
+            // 仅 gemini-3-pro-image-preview 支持 aspect_ratio
+            if (aspectRatio && /gemini-3-pro-image-preview/i.test(model)) {
+              payload.aspect_ratio = aspectRatio;
+            }
+
+            logRun(run, "info", `[${node.name}] image generation request -> ${endpoint} model=${model}`);
+          }
+
+          // 发送请求
+          // 对于图片编辑接口，某些 API 可能需要 multipart/form-data，但大多数支持 JSON（图片以 base64 传递）
+          // 先使用 JSON 格式，如果 API 不支持会返回错误，可以后续优化
+          const res = await fetch(endpoint, {
             method: "POST",
             headers: {
               "content-type": "application/json",
               authorization: `Bearer ${apiKey}`,
             },
-            body: JSON.stringify(imageGenPayload),
+            body: JSON.stringify(payload),
           });
 
           if (!res.ok) {
             const errText = await res.text();
-            throw new Error(`Image generation failed: ${res.status} ${errText}`);
+            throw new Error(`Image ${hasImageInput ? "edit" : "generation"} failed: ${res.status} ${errText}`);
           }
 
           const data = await res.json();
@@ -1281,6 +1388,7 @@ const executeNode = async (
             prompt,
             size,
             created: data.created,
+            mode: hasImageInput ? "edit" : "generation",
           };
           
           setByPath(context, outPath, imageOutput);
@@ -1291,7 +1399,7 @@ const executeNode = async (
           const textOutPath = `vars.${node.id}.text`;
           setByPath(context, textOutPath, imageUrl);
 
-          logRun(run, "info", `[${node.name}] image generated -> ${outPath} (${responseFormat === "b64_json" ? "base64" : "url"})`);
+          logRun(run, "info", `[${node.name}] image ${hasImageInput ? "edited" : "generated"} -> ${outPath} (${responseFormat === "b64_json" ? "base64" : "url"})`);
           logRun(
             run,
             "info",
@@ -1299,7 +1407,7 @@ const executeNode = async (
           );
           return { contextPatch: {} };
         } catch (err: any) {
-          const errMsg = `Image generation failed: ${err?.message || err}`;
+          const errMsg = `Image ${hasImageInput ? "edit" : "generation"} failed: ${err?.message || err}`;
           const outPath = (effectiveConfig.outputPath as string) || `vars.${node.id}.image`;
           setByPath(context, outPath, { error: errMsg });
           writeOutput(node, "image", { error: errMsg }, context);

@@ -86,7 +86,17 @@ ENDSSH
 
     "update"|"deploy")
         echo -e "${YELLOW}更新部署...${NC}"
-        ssh -p $SERVER_PORT $SERVER_USER@$SERVER_IP << ENDSSH
+        # 使用标准SSH密钥路径（根据部署文档）
+        SSH_KEY="$HOME/.ssh/id_rsa"
+        if [ -f "$SSH_KEY" ]; then
+            SSH_CMD="ssh -i $SSH_KEY -p $SERVER_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10"
+            echo -e "${GREEN}使用SSH密钥：$SSH_KEY${NC}"
+        else
+            SSH_CMD="ssh -p $SERVER_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10"
+            echo -e "${YELLOW}未找到SSH密钥，使用默认方式${NC}"
+        fi
+        
+        $SSH_CMD $SERVER_USER@$SERVER_IP << ENDSSH
             cd $PROJECT_DIR
             git fetch origin main
             git reset --hard origin/main
@@ -94,7 +104,17 @@ ENDSSH
             docker compose build --no-cache
             docker compose up -d
 ENDSSH
-        echo -e "${GREEN}更新完成！${NC}"
+        
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}更新完成！${NC}"
+        else
+            echo -e "${RED}更新失败！${NC}"
+            echo ""
+            echo -e "${YELLOW}根据部署文档，需要先配置SSH密钥：${NC}"
+            echo "执行：ssh-copy-id -p $SERVER_PORT $SERVER_USER@$SERVER_IP"
+            echo "或运行：./配置SSH密钥并部署.sh"
+            exit 1
+        fi
         ;;
 
     "status")
