@@ -1358,7 +1358,7 @@ const executeNode = async (
             throw new Error(`Image ${hasImageInput ? "edit" : "generation"} failed: ${res.status} ${errText}`);
           }
 
-          const data = await res.json();
+          const data = await res.json() as any;
           const imageData = data.data?.[0];
           
           if (!imageData) {
@@ -1387,7 +1387,7 @@ const executeNode = async (
             model,
             prompt,
             size,
-            created: data.created,
+            created: data.created || Date.now(),
             mode: hasImageInput ? "edit" : "generation",
           };
           
