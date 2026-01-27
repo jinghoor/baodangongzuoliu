@@ -1897,6 +1897,7 @@ const WorkflowEditor = () => {
         if (isLLM) {
           const model = String(n.data.config?.model || "");
           const isDoubaoSeed = /doubao-seed-1-8/i.test(model);
+          const isImageGeneration = /(nano-banana|gemini-.*-image)/i.test(model);
           
           if (isDoubaoSeed && typeof nodeOutput === "object" && nodeOutput !== null) {
             // Doubao-Seed-1.8: 分别提取 thinking 和 answer
@@ -1909,6 +1910,30 @@ const WorkflowEditor = () => {
                 lastOutput: answer || thinking || "", // 默认显示 answer，如果没有则显示 thinking
                 lastThinking: thinking,
                 lastAnswer: answer,
+                status: runStatus === "running" ? "running" : n.data.status,
+              },
+            };
+          } else if (isImageGeneration && typeof nodeOutput === "object" && nodeOutput !== null) {
+            // 图片生成模型: 提取图片 URL
+            const imageData = (nodeOutput as any).image || nodeOutput;
+            let imageUrl = "";
+            if (typeof imageData === "string") {
+              imageUrl = imageData;
+            } else if (imageData?.url) {
+              imageUrl = imageData.url;
+            } else if (imageData?.b64_json) {
+              imageUrl = `data:image/png;base64,${imageData.b64_json}`;
+            }
+            // 如果没有找到图片，尝试从 text 端口获取（后端也会输出 URL 到 text 端口）
+            if (!imageUrl && (nodeOutput as any).text) {
+              imageUrl = String((nodeOutput as any).text);
+            }
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                lastOutput: imageUrl || formatNodeOutput(nodeOutput, Infinity),
+                lastImages: imageUrl ? [imageUrl] : [],
                 status: runStatus === "running" ? "running" : n.data.status,
               },
             };
@@ -1951,11 +1976,18 @@ const WorkflowEditor = () => {
           // 检测模型配置，动态更新输出端口
           const model = String(n.data.config?.model || "");
           const isDoubaoSeed = /doubao-seed-1-8/i.test(model);
+          const isImageGeneration = /(nano-banana|gemini-.*-image)/i.test(model);
           const currentOutputs = n.data.outputs || [];
           const expectedOutputs = isDoubaoSeed
             ? [
                 { id: "thinking", label: "Thinking" },
                 { id: "answer", label: "Answer" },
+              ]
+            : isImageGeneration
+            ? [
+                { id: "image", label: "Image" },
+                { id: "text", label: "URL" },
+                { id: "fullResponse", label: "Full Response" },
               ]
             : [
                 { id: "text", label: "Text" },
@@ -2290,6 +2322,7 @@ const WorkflowEditor = () => {
         if (isLLM && key === "model") {
           const model = String(value || "");
           const isDoubaoSeed = /doubao-seed-1-8/i.test(model);
+          const isImageGeneration = /(nano-banana|gemini-.*-image)/i.test(model);
           
           let newOutputs: Array<{ id: string; label: string }> = [];
           if (isDoubaoSeed) {
@@ -2297,6 +2330,13 @@ const WorkflowEditor = () => {
             newOutputs = [
               { id: "thinking", label: "Thinking" },
               { id: "answer", label: "Answer" },
+            ];
+          } else if (isImageGeneration) {
+            // 图片生成模型: Image 和 Text（URL）
+            newOutputs = [
+              { id: "image", label: "Image" },
+              { id: "text", label: "URL" },
+              { id: "fullResponse", label: "Full Response" },
             ];
           } else {
             // 其他模型: Text 和 Full Response
@@ -2533,6 +2573,48 @@ const WorkflowEditor = () => {
                 }
               />
             </label>
+            {/(nano-banana|gemini-.*-image)/i.test(String(cfg.model || "")) && (
+              <>
+                <label className="field">
+                  <span>返回格式</span>
+                  <select
+                    value={String(cfg.response_format || "b64_json")}
+                    onChange={(e) => handleConfigChange("response_format", e.target.value)}
+                  >
+                    <option value="b64_json">Base64 (b64_json)</option>
+                    <option value="url">URL</option>
+                  </select>
+                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+                    b64_json 更稳定，url 格式有效期仅数小时
+                  </div>
+                </label>
+                <label className="field">
+                  <span>图片尺寸</span>
+                  <input
+                    value={String(cfg.size || "1024x1024")}
+                    onChange={(e) => handleConfigChange("size", e.target.value)}
+                    placeholder="1024x1024, 2:3, 1K, 2K, 4K"
+                  />
+                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+                    2.5系列支持比例（如 2:3）或分辨率（如 1024x1024）<br />
+                    gemini-3-pro-image-preview 支持 1K、2K、4K
+                  </div>
+                </label>
+                {/gemini-3-pro-image-preview/i.test(String(cfg.model || "")) && (
+                  <label className="field">
+                    <span>图片比例（仅 gemini-3-pro-image-preview）</span>
+                    <input
+                      value={String(cfg.aspect_ratio || "")}
+                      onChange={(e) => handleConfigChange("aspect_ratio", e.target.value)}
+                      placeholder="2:3"
+                    />
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+                      示例：2:3, 16:9, 1:1
+                    </div>
+                  </label>
+                )}
+              </>
+            )}
           </>
         ) : null}
 

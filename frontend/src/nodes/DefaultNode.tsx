@@ -155,13 +155,15 @@ function DefaultNode(props: NodeProps<NodeData>) {
   }, [inputs, outputs, rowCount]);
 
   const hasTextOutput = data.nodeType === "text-output";
-  const hasImageOutput = data.nodeType === "image-output";
   const hasImageInput = data.nodeType === "image-input";
   const isTextInput = data.nodeType === "text-input";
   const isLLM = ["llm", "llm-file", "llm-generic", "doubao-1-8"].includes(data.nodeType);
   // 检测是否是 Doubao-Seed-1.8 模型（需要分离显示 Thinking 和 Answer）
+  // 检测是否是图片生成模型（nano-banana 系列）
   const model = String(data.config?.model || "");
   const isDoubaoSeed = isLLM && /doubao-seed-1-8/i.test(model);
+  const isImageGeneration = isLLM && /(nano-banana|gemini-.*-image)/i.test(model);
+  const hasImageOutput = data.nodeType === "image-output" || isImageGeneration;
   
   // 折叠状态管理（默认折叠）
   const [thinkingCollapsed, setThinkingCollapsed] = useState(true);

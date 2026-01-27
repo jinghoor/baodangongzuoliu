@@ -988,6 +988,8 @@ const executeNode = async (
       const rawBaseURL = (effectiveConfig.baseURL as string) || "https://api.openai.com/v1";
       const baseURL = rawBaseURL.replace(/\/+$/, ""); // 去掉末尾多余的 /
       const model = (effectiveConfig.model as string) || "gpt-4o-mini";
+      // 检测是否是图片生成模型（nano-banana 系列）
+      const isImageGeneration = /(nano-banana|gemini-.*-image)/i.test(model);
       // 检测是否是 Doubao 模型（通过模型名称或 baseURL）
       const isDoubao = /doubao/i.test(model) || /volces\.com/i.test(baseURL);
       const apiKey =
@@ -1196,6 +1198,114 @@ const executeNode = async (
           hasImage: !!c.image_url,
         }));
         logRun(run, "info", `[${node.name}] messageContent: ${JSON.stringify(summary)}`);
+      }
+
+      // 如果是图片生成模式，使用图片生成 API
+      if (isImageGeneration) {
+        const prompt = basePrompt || textParts.join("\n\n") || "";
+        if (!prompt) {
+          logRun(run, "error", `[${node.name}] Image generation requires a prompt`);
+          throw new Error("Image generation requires a prompt");
+        }
+
+        if (!apiKey) {
+          const mockImage = `MOCK_IMAGE(${model}): ${prompt.slice(0, 200)}`;
+          const outPath = (effectiveConfig.outputPath as string) || `vars.${node.id}.image`;
+          setByPath(context, outPath, { url: mockImage, note: "mock image" });
+          writeOutput(node, "image", { url: mockImage }, context);
+          logRun(run, "info", `[${node.name}] mock image generation -> ${outPath}`);
+          return { contextPatch: {} };
+        }
+
+        // 构建图片生成请求
+        const imageGenEndpoint = `${baseURL}/images/generations`;
+        const responseFormat = (effectiveConfig.response_format as string) || "b64_json";
+        const size = (effectiveConfig.size as string) || "1024x1024";
+        const aspectRatio = effectiveConfig.aspect_ratio as string | undefined;
+
+        const imageGenPayload: any = {
+          model,
+          prompt,
+          response_format: responseFormat,
+          size,
+        };
+
+        // 仅 gemini-3-pro-image-preview 支持 aspect_ratio
+        if (aspectRatio && /gemini-3-pro-image-preview/i.test(model)) {
+          imageGenPayload.aspect_ratio = aspectRatio;
+        }
+
+        try {
+          logRun(run, "info", `[${node.name}] image generation request -> ${imageGenEndpoint} model=${model}`);
+          const res = await fetch(imageGenEndpoint, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(imageGenPayload),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Image generation failed: ${res.status} ${errText}`);
+          }
+
+          const data = await res.json();
+          const imageData = data.data?.[0];
+          
+          if (!imageData) {
+            throw new Error("No image data in response");
+          }
+
+          let imageUrl: string;
+          let imageBase64: string | undefined;
+
+          if (imageData.b64_json) {
+            // Base64 格式
+            imageBase64 = imageData.b64_json;
+            imageUrl = `data:image/png;base64,${imageBase64}`;
+          } else if (imageData.url) {
+            // URL 格式
+            imageUrl = imageData.url;
+          } else {
+            throw new Error("No image URL or base64 data in response");
+          }
+
+          // 输出图片
+          const outPath = (effectiveConfig.outputPath as string) || `vars.${node.id}.image`;
+          const imageOutput = {
+            url: imageUrl,
+            ...(imageBase64 ? { b64_json: imageBase64 } : {}),
+            model,
+            prompt,
+            size,
+            created: data.created,
+          };
+          
+          setByPath(context, outPath, imageOutput);
+          writeOutput(node, "image", imageOutput, context);
+          
+          // 同时输出 URL 字符串到 text 端口（兼容性）
+          writeOutput(node, "text", imageUrl, context);
+          const textOutPath = `vars.${node.id}.text`;
+          setByPath(context, textOutPath, imageUrl);
+
+          logRun(run, "info", `[${node.name}] image generated -> ${outPath} (${responseFormat === "b64_json" ? "base64" : "url"})`);
+          logRun(
+            run,
+            "info",
+            `[${node.name}] outputs: ${formatLogValue(getByPath(context, `_outputs.${node.id}`))}`,
+          );
+          return { contextPatch: {} };
+        } catch (err: any) {
+          const errMsg = `Image generation failed: ${err?.message || err}`;
+          const outPath = (effectiveConfig.outputPath as string) || `vars.${node.id}.image`;
+          setByPath(context, outPath, { error: errMsg });
+          writeOutput(node, "image", { error: errMsg }, context);
+          logRun(run, "error", `[${node.name}] ${errMsg}`);
+          throw err;
+        }
       }
 
       if (!apiKey) {

@@ -1,0 +1,32 @@
+name: 自动部署到服务器
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.PROJECT_DIR }}
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
+            docker compose ps
