@@ -1258,7 +1258,7 @@ const executeNode = async (
 
           if (hasImageInput && inputImages.length > 0) {
             // 有图像输入 -> 使用图片编辑接口（图生图）
-            endpoint = `${baseURL}/images/edits`;
+            endpoint = `${baseURL}/v1/image/edits`;
             
             // 处理第一张图片（图片编辑接口通常只支持一张输入图片）
             const firstImage = inputImages[0];
@@ -1324,7 +1324,7 @@ const executeNode = async (
             logRun(run, "info", `[${node.name}] image edit request -> ${endpoint} model=${model} (${inputImages.length} input images, using first image)`);
           } else {
             // 无图像输入 -> 使用图片生成接口（文生图）
-            endpoint = `${baseURL}/images/generations`;
+            endpoint = `${baseURL}/v1/image/generations`;
             
             payload = {
               model,
