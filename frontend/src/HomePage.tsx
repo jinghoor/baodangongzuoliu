@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import { apiBase, apiFetch } from "./api";
@@ -32,6 +32,9 @@ const HomePage = () => {
   const [deleteTarget, setDeleteTarget] = useState<Workflow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
+  const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null);
+  const [dragOverTemplateId, setDragOverTemplateId] = useState<string | null>(null);
+  const [isReorderingTemplates, setIsReorderingTemplates] = useState(false);
 
 
   const formatDate = (dateString: string) => {
@@ -151,40 +154,9 @@ const HomePage = () => {
     }
   };
 
-  // 使用热门模版创建个人项目
-  const handleUseTemplate = async (template: TemplateWorkflow) => {
-    try {
-      // 读取模版详情
-      const res = await apiFetch(`/workflows/${template.id}`);
-      if (!res.ok) throw new Error("Failed to fetch template");
-      const tpl = await res.json();
-
-      // 基于模版创建用户自己的项目
-      const createRes = await apiFetch("/workflows", {
-        method: "POST",
-        body: JSON.stringify({
-          name: tpl.name || "基于热门模版的新项目",
-          nodes: tpl.nodes || [],
-          edges: tpl.edges || [],
-          ...(tpl.thumbnail ? { thumbnail: tpl.thumbnail } : {}),
-        }),
-      });
-      if (!createRes.ok) {
-        const text = await createRes.text();
-        throw new Error(text || "Failed to create workflow from template");
-      }
-      const newWorkflow = await createRes.json();
-      // 跳转到新项目编辑页
-      if (newWorkflow && newWorkflow.id) {
-        navigate(`/workflow/${newWorkflow.id}`);
-      } else {
-        // 兜底：刷新项目列表
-        await fetchWorkflows();
-      }
-    } catch (err) {
-      console.error("Error using template:", err);
-      alert("基于热门模版创建项目失败");
-    }
+  // 打开热门模版（非管理员保存时会自动另存为新项目）
+  const handleUseTemplate = (template: TemplateWorkflow) => {
+    navigate(`/workflow/${template.id}`);
   };
 
   // 管理员：重命名热门模版
@@ -274,6 +246,75 @@ const HomePage = () => {
       alert("调整热门模版排序失败");
     }
   };
+
+  const persistTemplateOrder = async (ordered: TemplateWorkflow[]) => {
+    if (user?.role !== "admin") return;
+    setIsReorderingTemplates(true);
+    try {
+      for (let i = 0; i < ordered.length; i += 1) {
+        const tpl = ordered[i];
+        const res = await apiFetch(`/templates/${tpl.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ templateOrder: i }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to reorder templates");
+        }
+      }
+    } catch (err) {
+      console.error("Error reordering templates:", err);
+      alert("拖拽排序失败，将恢复原有顺序");
+      await fetchTemplates();
+    } finally {
+      setIsReorderingTemplates(false);
+    }
+  };
+
+  const handleTemplateDragStart = (id: string, e: DragEvent<HTMLDivElement>) => {
+    if (user?.role !== "admin") return;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+    setDraggingTemplateId(id);
+  };
+
+  const handleTemplateDragOver = (id: string, e: DragEvent<HTMLDivElement>) => {
+    if (user?.role !== "admin") return;
+    e.preventDefault();
+    if (draggingTemplateId && draggingTemplateId !== id) {
+      setDragOverTemplateId(id);
+    }
+  };
+
+  const handleTemplateDrop = async (id: string, e: DragEvent<HTMLDivElement>) => {
+    if (user?.role !== "admin") return;
+    e.preventDefault();
+    const dragId = draggingTemplateId || e.dataTransfer.getData("text/plain");
+    if (!dragId || dragId === id) {
+      setDragOverTemplateId(null);
+      return;
+    }
+    const fromIndex = templates.findIndex((t) => t.id === dragId);
+    const toIndex = templates.findIndex((t) => t.id === id);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const next = [...templates];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const ordered = next.map((tpl, index) => ({
+      ...tpl,
+      templateOrder: index,
+    }));
+    setTemplates(ordered);
+    setDragOverTemplateId(null);
+    await persistTemplateOrder(ordered);
+  };
+
+  const handleTemplateDragEnd = () => {
+    setDraggingTemplateId(null);
+    setDragOverTemplateId(null);
+  };
+
+  const visibleTemplates = user?.role === "admin" ? templates : templates.slice(0, 8);
 
   const handleShare = async (id: string, e?: React.MouseEvent) => {
     if (e) {
@@ -476,7 +517,7 @@ const HomePage = () => {
 
         <div className="home-projects">
           <div className="projects-header">
-            <h2 className="projects-title">最近项目</h2>
+            <h2 className="projects-title">我的项目</h2>
             <div className="projects-actions">
               <button className="projects-view-all" onClick={handleImportShare}>
                 导入分享
@@ -606,7 +647,7 @@ const HomePage = () => {
                   className="projects-view-all"
                   type="button"
                   onClick={handleCreateTemplate}
-                  disabled={creatingTemplate}
+                  disabled={creatingTemplate || isReorderingTemplates}
                 >
                   {creatingTemplate ? "创建中..." : "新建热门模版"}
                 </button>
@@ -621,11 +662,20 @@ const HomePage = () => {
             ) : templates.length === 0 ? (
               <div className="project-card empty">暂无热门模版</div>
             ) : (
-              templates.slice(0, 8).map((tpl) => (
+              visibleTemplates.map((tpl) => (
                 <div
                   key={tpl.id}
-                  className="project-card"
+                  className={`project-card${
+                    draggingTemplateId === tpl.id ? " is-dragging" : ""
+                  }${dragOverTemplateId === tpl.id ? " is-drag-over" : ""}${
+                    user?.role === "admin" ? " is-draggable" : ""
+                  }`}
                   onClick={() => handleUseTemplate(tpl)}
+                  draggable={user?.role === "admin"}
+                  onDragStart={(e) => handleTemplateDragStart(tpl.id, e)}
+                  onDragOver={(e) => handleTemplateDragOver(tpl.id, e)}
+                  onDrop={(e) => handleTemplateDrop(tpl.id, e)}
+                  onDragEnd={handleTemplateDragEnd}
                 >
                   <div className="project-thumbnail">
                     {tpl.thumbnail ? (

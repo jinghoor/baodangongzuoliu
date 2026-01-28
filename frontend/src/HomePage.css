@@ -393,6 +393,21 @@
   position: relative;
 }
 
+.project-card.is-draggable {
+  cursor: grab;
+}
+
+.project-card.is-dragging {
+  opacity: 0.65;
+  border-style: dashed;
+  cursor: grabbing;
+}
+
+.project-card.is-drag-over {
+  border-color: #f59e0b;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);
+}
+
 .project-card:hover {
   border-color: #2563eb;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);

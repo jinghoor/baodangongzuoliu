@@ -493,11 +493,12 @@ const Guidelines = ({ x, y }: GuidelinesState) => {
 
 const WorkflowEditor = () => {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { setUser, user } = useAuth();
   const { id } = useParams<{ id?: string }>();
   const nodeTypes = useMemo<NodeTypes>(() => ({ default: DefaultNode }), []);
   const [workflowName, setWorkflowName] = useState("我的可视化工作流");
   const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [isTemplateWorkflow, setIsTemplateWorkflow] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1231,6 +1232,7 @@ const WorkflowEditor = () => {
   const handleSave = async (opts?: { silent?: boolean }) => {
     setIsSaving(true);
     try {
+      const shouldForkTemplate = isTemplateWorkflow && user?.role !== "admin";
       // 生成并上传缩略图
       const thumbnailUrl = await generateAndUploadThumbnail();
       
@@ -1273,7 +1275,7 @@ const WorkflowEditor = () => {
         return res;
       };
 
-      let res = await saveOnce(workflowId);
+      let res = await saveOnce(shouldForkTemplate ? null : workflowId);
       if (res.status === 404 && workflowId) {
         // 后端已无此工作流，重建为新项目
         setWorkflowId(null);
@@ -1286,9 +1288,14 @@ const WorkflowEditor = () => {
       }
       const data = await res.json();
       setWorkflowId(data.id);
-      // 如果URL中没有id，更新URL
-      if (!id && data.id) {
-        navigate(`/workflow/${data.id}`, { replace: true });
+      if (shouldForkTemplate) {
+        setIsTemplateWorkflow(false);
+      }
+      // 如果URL中没有id，或从模版另存为新项目，更新URL
+      if (data.id) {
+        if (shouldForkTemplate || !id) {
+          navigate(`/workflow/${data.id}`, { replace: true });
+        }
       }
       return data.id as string;
     } catch (err) {
@@ -1329,7 +1336,8 @@ const WorkflowEditor = () => {
     setWorkflowName(trimmed);
     setIsEditingName(false);
     // 如果工作流已保存，更新名称
-    if (workflowId) {
+    const shouldForkTemplate = isTemplateWorkflow && user?.role !== "admin";
+    if (workflowId && !shouldForkTemplate) {
       try {
         const res = await apiFetch(`/workflows/${workflowId}`);
         if (!res.ok) return;
@@ -3839,6 +3847,7 @@ const WorkflowEditor = () => {
           if (res.status === 404) {
             // 工作流不存在，清理ID，允许重新保存为新项目
             setWorkflowId(null);
+            setIsTemplateWorkflow(false);
             setWorkflowName("我的可视化工作流");
             setHasLoaded(true);
             setLoadError("工作流不存在或已被删除");
@@ -3851,6 +3860,7 @@ const WorkflowEditor = () => {
           
           setWorkflowName(data.name || "我的可视化工作流");
           setWorkflowId(data.id);
+          setIsTemplateWorkflow(Boolean(data.isTemplate));
           setHasLoaded(true);
           setLoadError(null);
           
@@ -4006,6 +4016,7 @@ const WorkflowEditor = () => {
           setNodes([]);
           setEdges([]);
           setWorkflowId(null);
+          setIsTemplateWorkflow(false);
           setWorkflowName("我的可视化工作流");
           setHasLoaded(true);
           setLoadError(err instanceof Error ? err.message : "无法加载工作流");
@@ -4020,6 +4031,7 @@ const WorkflowEditor = () => {
         setNodes([]);
         setEdges([]);
         setWorkflowId(null);
+        setIsTemplateWorkflow(false);
         setWorkflowName("我的可视化工作流");
       }
     }
