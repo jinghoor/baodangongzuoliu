@@ -100,7 +100,7 @@ const palette: PaletteSection[] = [
 const defaultConfigByType: Record<string, Record<string, unknown>> = {
   llm: { prompt: "Hello {{user}}", model: "gpt-4o-mini", outputPath: "vars.llm.text" },
   "llm-generic": {
-    prompt: "Hello {{user}}",
+    prompt: "",
     model: "gpt-4o-mini",
     baseURL: "https://api.openai.com/v1",
     inputSources: [{ mode: "source", format: "text", sourcePath: "", defaultValue: "", inputLabel: "Input 1" }],
