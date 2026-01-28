@@ -1258,7 +1258,8 @@ const executeNode = async (
 
           if (hasImageInput && inputImages.length > 0) {
             // 有图像输入 -> 使用图片编辑接口（图生图）
-            endpoint = `${baseURL}/v1/image/edits`;
+            // 大部分 OpenAI 兼容服务使用 /v1/images/edits（images 复数）
+            endpoint = `${baseURL}/v1/images/edits`;
             
             // 处理第一张图片（图片编辑接口通常只支持一张输入图片）
             const firstImage = inputImages[0];
@@ -1324,7 +1325,8 @@ const executeNode = async (
             logRun(run, "info", `[${node.name}] image edit request -> ${endpoint} model=${model} (${inputImages.length} input images, using first image)`);
           } else {
             // 无图像输入 -> 使用图片生成接口（文生图）
-            endpoint = `${baseURL}/v1/image/generations`;
+            // 大部分 OpenAI 兼容服务使用 /v1/images/generations（images 复数）
+            endpoint = `${baseURL}/v1/images/generations`;
             
             payload = {
               model,
@@ -1455,8 +1457,8 @@ const executeNode = async (
           ],
         };
       } else {
-        // 标准 OpenAI 兼容格式
-        endpoint = `${baseURL}/chat/completions`;
+        // 标准 OpenAI 兼容格式（大部分服务使用 /v1/chat/completions）
+        endpoint = `${baseURL}/v1/chat/completions`;
         payload = {
           model,
           messages: [{ role: "user", content: messageContent }],
@@ -2131,10 +2133,9 @@ app.post("/admin/users/:id/role", requireAuth, requireAdmin, (req, res) => {
 
 app.get("/workflows", requireAuth, (req: AuthRequest, res) => {
   const user = req.user!;
-  const items =
-    user.role === "admin"
-      ? workflows
-      : workflows.filter((wf) => wf.ownerId === user.id);
+  // 普通“我的项目”列表不包含热门模版
+  const base = workflows.filter((wf) => !wf.isTemplate);
+  const items = user.role === "admin" ? base : base.filter((wf) => wf.ownerId === user.id);
   res.json({ items });
 });
 
@@ -2179,6 +2180,10 @@ app.put("/workflows/:id", requireAuth, (req: AuthRequest, res) => {
   const now = new Date().toISOString();
   const current = workflows[idx];
   if (!current) return res.status(404).json({ message: "workflow not found" });
+  // 对于热门模版，仅管理员可以通过 /templates 接口编辑，这里拒绝直接修改
+  if (current.isTemplate && user.role !== "admin") {
+    return res.status(403).json({ message: "Templates can only be modified by admin" });
+  }
   if (current.ownerId && current.ownerId !== user.id && user.role !== "admin") {
     return res.status(404).json({ message: "workflow not found" });
   }
@@ -2196,6 +2201,97 @@ app.put("/workflows/:id", requireAuth, (req: AuthRequest, res) => {
   registerSchedules(updated);
   rebuildWebhookMap();
   res.json(workflows[idx]);
+});
+
+// ========== 热门模版（Templates）相关接口 ==========
+
+// 获取所有热门模版：所有已登录用户都可见
+app.get("/templates", requireAuth, (_req: AuthRequest, res) => {
+  const items = workflows
+    .filter((wf) => wf.isTemplate)
+    .sort((a, b) => {
+      const orderA = a.templateOrder ?? 0;
+      const orderB = b.templateOrder ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  res.json({ items });
+});
+
+// 创建热门模版：仅管理员
+app.post("/templates", requireAuth, requireAdmin, (req: AuthRequest, res) => {
+  const user = req.user!;
+  const { name, nodes, edges, thumbnail, templateOrder } = req.body;
+  if (!name || !Array.isArray(nodes) || !Array.isArray(edges)) {
+    return res.status(400).json({ message: "name, nodes[], edges[] are required" });
+  }
+  const now = new Date().toISOString();
+  const workflow: WorkflowDefinition = {
+    id: uuidv4(),
+    name,
+    version: 1,
+    // 模版对所有用户公开，因此 ownerId 置空字符串，访问控制依赖 isTemplate + 管理员判断
+    ownerId: "",
+    isTemplate: true,
+    templateOrder:
+      typeof templateOrder === "number"
+        ? templateOrder
+        : (workflows
+            .filter((wf) => wf.isTemplate)
+            .reduce((min, wf) => Math.min(min, wf.templateOrder ?? 0), 0) || 0) - 1,
+    nodes,
+    edges,
+    ...(thumbnail ? { thumbnail } : {}),
+    createdAt: now,
+    updatedAt: now,
+  };
+  workflows.push(workflow);
+  saveWorkflows();
+  registerSchedules(workflow);
+  rebuildWebhookMap();
+  res.status(201).json(workflow);
+});
+
+// 更新热门模版：仅管理员，可部分更新（名称、节点、边、缩略图、排序）
+app.put("/templates/:id", requireAuth, requireAdmin, (req: AuthRequest, res) => {
+  const idx = workflows.findIndex((w) => w.id === req.params.id && w.isTemplate);
+  if (idx === -1) return res.status(404).json({ message: "template not found" });
+  const current = workflows[idx];
+  const { name, nodes, edges, thumbnail, templateOrder } = req.body ?? {};
+  const now = new Date().toISOString();
+  const updated: WorkflowDefinition = {
+    ...current,
+    ...(typeof name === "string" && name.trim() ? { name: name.trim() } : {}),
+    ...(Array.isArray(nodes) ? { nodes } : {}),
+    ...(Array.isArray(edges) ? { edges } : {}),
+    ...(thumbnail !== undefined ? { thumbnail } : {}),
+    ...(templateOrder !== undefined ? { templateOrder: Number(templateOrder) } : {}),
+    isTemplate: true,
+    updatedAt: now,
+  };
+  workflows[idx] = updated;
+  saveWorkflows();
+  registerSchedules(updated);
+  rebuildWebhookMap();
+  res.json(updated);
+});
+
+// 删除热门模版：仅管理员
+app.delete("/templates/:id", requireAuth, requireAdmin, (req: AuthRequest, res) => {
+  const idx = workflows.findIndex((w) => w.id === req.params.id && w.isTemplate);
+  if (idx === -1) return res.status(404).json({ message: "template not found" });
+  const [removed] = workflows.splice(idx, 1);
+  saveWorkflows();
+  // 取消相关定时任务 / webhook
+  if (removed) {
+    const schedules = scheduleMap.get(removed.id);
+    if (schedules) {
+      schedules.forEach((timeout) => clearTimeout(timeout));
+      scheduleMap.delete(removed.id);
+    }
+  }
+  rebuildWebhookMap();
+  res.json({ message: "template deleted", id: req.params.id });
 });
 
 app.get("/workflows/:id", requireAuth, (req: AuthRequest, res) => {

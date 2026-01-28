@@ -47,6 +47,10 @@ export type WorkflowDefinition = {
   name: string;
   version: number;
   ownerId: string;
+  // 是否为热门模版（所有用户可见，仅管理员可编辑）
+  isTemplate?: boolean;
+  // 热门模版排序（数值越小越靠前），普通项目可忽略
+  templateOrder?: number;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   thumbnail?: string;
