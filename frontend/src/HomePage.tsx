@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import { apiBase, apiFetch } from "./api";
 import { useAuth } from "./auth";
+import LanguageSelect from "./LanguageSelect";
 
 type Workflow = {
   id: string;
@@ -459,12 +460,7 @@ const HomePage = () => {
           <span className="logo-text">爆单工作流</span>
         </div>
         <div className="home-nav">
-          <div className="lang-select-wrapper">
-            <span className="lang-icon">🌐</span>
-            <select className="lang-select">
-              <option>简体中文</option>
-            </select>
-          </div>
+          <LanguageSelect />
           <button className="nav-icon-btn">🔔</button>
           <button className="nav-upgrade-btn">
             ⚡ 积分 <span className="upgrade-points">{user?.credits ?? 0}</span>
