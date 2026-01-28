@@ -2300,8 +2300,11 @@ app.get("/workflows/:id", requireAuth, (req: AuthRequest, res) => {
   if (!workflow) {
     return res.status(404).json({ message: "workflow not found" });
   }
-  if (workflow.ownerId && workflow.ownerId !== user.id && user.role !== "admin") {
-    return res.status(404).json({ message: "workflow not found" });
+  // 热门模版对所有用户只读开放；普通项目仍按 ownerId / admin 控制
+  if (!workflow.isTemplate) {
+    if (workflow.ownerId && workflow.ownerId !== user.id && user.role !== "admin") {
+      return res.status(404).json({ message: "workflow not found" });
+    }
   }
   res.json(workflow);
 });
